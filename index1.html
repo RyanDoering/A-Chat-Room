@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>AS3 Chat</title> <!-- The CSS file does not work here-->
+    <!-- <link rel="stylesheet" href="as31.css">  Add my CSS style sheet to the document -->
+</head>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+<script> //This is the client
+    $(function () 
+    {
+        var socket = io();
+        var username; //username of the user gotten from the server 
+
+        //Form for writing the message into
+        $('form').submit(function(e) 
+        {
+            e.preventDefault(); // prevents page reloading
+            socket.emit('chat message', {message: $('#chat-bar').val()}); //emits a chat message with the chat bar value
+            $('#chat-bar').val(''); //clears the chat bar
+            return false;
+        });
+        
+        //send the cookie to the server, so it can be set
+        socket.on('get cookie', function(msg) { //add a source for this and chang efunction name
+            var decodedCookie = decodeURIComponent(document.cookie);
+            console.log("Decoded cookie is: " + decodedCookie);
+            socket.emit('set cookie', decodedCookie);
+        });
+
+        //For when the new user joins, this will update all of the past messages for them
+        socket.on('update messages', function(msg) {
+            for(var i = 0; i < msg.length; i++)
+            {
+                $('#messages').prepend($('<li>').html(msg[i].time + " " + "<font color=\"" + msg[i].color + "\">" + msg[i].user + "</font>" + " " + msg[i].message));
+            }
+        });
+
+        //To display the chat for all of the users, bold for the user who sent it 
+        socket.on('chat message', function(msg)
+        {
+            //if a message is sent by the user it needs to be bolded
+            if (username == msg.user)
+            {
+                //console.log("BOLD THAT BITCH");
+                $('#messages').prepend($('<li>').html(msg.time + " " + "<font color=\"" + msg.color + "\">" + msg.user + "</font>" + " " + "<b>" + msg.message + "</b>"));
+            }
+            else //else, it appears normally to everyone else 
+            {
+                //console.log("Normal writing...");
+                $('#messages').prepend($('<li>').html(msg.time + " " + "<font color=\"" + msg.color + "\">" + msg.user + "</font>" + " " + msg.message));
+            }
+
+        });
+
+        //Used to update the onine user list on the right side
+        socket.on('update users', function(msg) 
+        {
+            console.log("MESSAGE LENGTH: " + msg.length);
+            $('#users').empty();
+            for (var i = 0; i < msg.length; i++)
+            {
+                console.log("COLOR: " + msg[i].nameColor);
+                console.log("user " + msg[i].username);
+                var color = msg[i].nameColor;
+                $('#users').prepend($('<li>').html("<b><font color=\"" + color + "\">" + msg[i].username + "</font>"));  
+            }
+        });
+
+        //Message for a new user joining the chat
+        socket.on('user join', function(msg, color) {
+            $('#messages').prepend($('<li>').html("------ !!  " + "<font color=\"" + color + "\">" + msg + "</font>" + " has joined the chat  !! ------"));
+        });
+
+        //Update for a user who disconnects from the chat
+        socket.on('user leave', function(msg, color) {
+            $('#messages').prepend($('<li>').html("------ !!  " + "<font color=\"" + color + "\">" + msg + "</font>" + " has left the chat  !! ------"));
+        });
+
+        //Update for the user who has changed their username or username color
+        socket.on('name update', function(user, color) {
+            username = user;
+            $('#messages').prepend($('<li>').html("------ !! Your nickname has been updated and is now " + "<font color=\"" + color + "\">" + user + "</font>" + "  !! ------"));
+        });
+
+        //Error to display if a user tries to use the same username as another user
+        socket.on('name error', function(msg) {
+            $('#messages').prepend($('<li>').html("------ !! The nickname " + msg + " has already been taken !! ------"));
+        });
+
+        //CHANGE THIS IF I CHANGE THE BACKGROUND COLOR
+        //Error displayed to users if they try to change their name color to that of the background
+        socket.on('color error', function(msg) {
+            $('#messages').prepend($('<li>').html("------ !! You can not make your name the same color as the background !! ------"));
+        });
+
+        //A welcome message for the user who joins the chat, displays their username
+        socket.on('your info', function(msg) {
+            username = msg;
+            $('#messages').prepend($('<li>').html("------ !! Welcome to the chat, your username is " + msg + " !! ------"));
+        });
+
+        socket.on('welcome back', function(msg) {
+            username = msg;
+            $('#messages').prepend($('<li>').html("------ !! Welcome back to the chat, your username is still " + msg + " !! ------"));
+        });
+
+        socket.on('username taken', function(msg) {
+            username = msg;
+            $('#messages').prepend($('<li>').html("------ !! Welcome to the chat, your username was taken when you were gone. New username is " + msg + " !! ------"));
+        });
+    });
+
+</script>
+
+<body>
+    <div class="chat-screen">
+        <ul id="messages"></ul>
+    </div>
+    <div class="online-users">
+        <ul id="users"></ul>
+    </div>
+    <div class="input-field">
+        <form action="">
+            <input id="chat-bar" autocomplete="off" /> <!--<button>Send</button>-->
+        </form>
+    </div>
+</body>
+
+<style>
+    html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100vh;
+        background-color: aquamarine;
+        position: relative;
+        box-sizing: border-box;
+    }
+
+    .chat-screen {
+        height: 90%;
+        background-color: rgb(71, 71, 71);
+        float: left;
+        width: 70%;
+    }
+
+    .online-users {
+        width: 30%;
+        height: 90%;
+        background-color: grey;
+        float: right;
+    }
+
+    #messages {
+        overflow-y: scroll;
+        display: flex;
+        flex-direction: column-reverse;
+        width: 70%;
+        height: 90%;
+        padding: 0;
+        margin: 0;
+        position: absolute;
+    }
+
+    #users {
+        overflow-y: scroll;
+        display: flex;
+        flex-direction: column-reverse;
+        width: 30%;
+        height: 90%;
+        padding: 0;
+        margin: 0;
+        position: absolute;
+    }
+
+    form input {
+        width: 98%;
+        line-height: 4vh;
+        margin-top: 10px;
+        margin-left: 10px;
+    }
+</style>
+
+</html>
